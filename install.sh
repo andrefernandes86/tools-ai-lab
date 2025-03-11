@@ -28,6 +28,11 @@ if ! command -v docker-compose &> /dev/null; then
     sudo apt install -y docker-compose
 fi
 
+# Ensure Docker is running
+echo "🔄 Checking Docker service..."
+sudo systemctl restart docker
+sleep 5
+
 # 3️⃣ Install Ollama
 echo "🔄 Installing Ollama..."
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -64,8 +69,19 @@ FROM deepseek-llm:7b
 PARAMETER memory=True
 EOF
 
+# Ensure the file is properly written before using it
+if [ ! -s "$DATA_DIR/memory_model.modelfile" ]; then
+    echo "❌ Error: Memory model file was not created correctly."
+    exit 1
+fi
+
 # Create the model with memory enabled
 ollama create my-deepseek-memory -f $DATA_DIR/memory_model.modelfile
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to create the custom memory model. Retrying..."
+    sleep 5
+    ollama create my-deepseek-memory -f $DATA_DIR/memory_model.modelfile
+fi
 
 echo "✅ Custom model 'my-deepseek-memory' created with memory support at $DATA_DIR."
 
