@@ -38,7 +38,7 @@ chmod +x install.sh run.sh update.sh stop.sh
 ## **📌 Access the AI Assistant**
 After installation, you can access Open WebUI at:
 
-🔗 **http://your-server-ip**
+🔗 **http://your-server-ip:3000**
 
 ---
 
