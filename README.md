@@ -9,7 +9,6 @@ This project provides a fully functional AI assistant powered by **Ollama**, **D
 ✅ **DeepSeek 7B** – Language model with memory persistence  
 ✅ **Open WebUI** – Web-based UI for interacting with the AI  
 ✅ **Automatic startup on reboot**  
-✅ **Easy install, update, and stop scripts**
 
 ---
 
