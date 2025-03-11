@@ -1,18 +1,12 @@
 #!/bin/bash
 
-echo "🚨 Stopping all AI services..."
+echo "🛑 Stopping Ollama and Open WebUI..."
 
-# Stop Open WebUI
-echo "🔴 Stopping Open WebUI..."
-cd /home/$(whoami)/open-webui
-sudo docker-compose down
+# Stop running containers
+docker stop ollama open-webui
 
-# Stop Ollama
-if pgrep -x "ollama" > /dev/null; then
-    echo "🔴 Stopping Ollama..."
-    pkill -f "ollama serve"
-else
-    echo "✅ Ollama is already stopped."
-fi
+# Optionally remove stopped containers to free up space
+echo "🗑️ Removing stopped containers..."
+docker rm ollama open-webui
 
-echo "✅ AI Assistant services have been stopped."
+echo "✅ All services stopped!"
