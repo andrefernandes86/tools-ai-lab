@@ -1,10 +1,13 @@
-#!/bin/bash
+# Creating the install.sh script with DeepSeek 7B
+
+install_script_content = """#!/bin/bash
 
 # Detect username dynamically
 USER=$(whoami)
 DATA_DIR="/home/$USER/data"
+WEBUI_DIR="/home/$USER/open-webui"
 
-echo "🚀 Starting installation of Ollama + DeepSeek 14B + Open WebUI..."
+echo "🚀 Starting installation of Ollama + DeepSeek 7B + Open WebUI..."
 
 # 1️⃣ Update System Packages
 echo "🔄 Checking and updating system packages..."
@@ -31,17 +34,17 @@ fi
 echo "🔄 Installing Ollama..."
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# 4️⃣ Pull DeepSeek 14B Model
-echo "🔄 Downloading DeepSeek LLM 14B..."
-ollama pull deepseek-llm:14b
+# 4️⃣ Pull DeepSeek 7B Model
+echo "🔄 Downloading DeepSeek LLM 7B..."
+ollama pull deepseek-llm:7b
 
 # 5️⃣ Install Open WebUI
 echo "🔄 Installing Open WebUI..."
-mkdir -p /home/$USER/open-webui
-cd /home/$USER/open-webui
+mkdir -p $WEBUI_DIR
+cd $WEBUI_DIR
 wget https://github.com/open-webui/open-webui/releases/latest/download/open-webui-linux.zip
-unzip open-webui-linux.zip -d /home/$USER/open-webui/
-chmod +x /home/$USER/open-webui/open-webui
+unzip open-webui-linux.zip -d $WEBUI_DIR
+chmod +x $WEBUI_DIR/open-webui
 
 # 6️⃣ Create Persistent Memory Directory
 echo "🔄 Checking and creating memory storage directory..."
@@ -49,7 +52,7 @@ mkdir -p $DATA_DIR
 
 echo "🔄 Creating custom model with memory..."
 cat <<EOF > $DATA_DIR/memory_model.modelfile
-FROM deepseek-llm:14b
+FROM deepseek-llm:7b
 PARAMETER memory=True
 EOF
 
@@ -60,7 +63,7 @@ echo "✅ Custom model 'my-deepseek-memory' created with memory support at $DATA
 
 # 7️⃣ Configure Open WebUI
 echo "🔄 Setting up Open WebUI to run on Port 80..."
-cat <<EOF > /home/$USER/open-webui/docker-compose.yml
+cat <<EOF > $WEBUI_DIR/docker-compose.yml
 version: '3.8'
 services:
   open-webui:
@@ -78,8 +81,17 @@ EOF
 
 # 8️⃣ Start Open WebUI
 echo "🚀 Starting Open WebUI..."
-cd /home/$USER/open-webui
+cd $WEBUI_DIR
 sudo docker-compose up -d
 
 echo "✅ Installation complete! 🎉"
 echo "🌐 Access your AI Assistant at: http://your-server-ip"
+"""
+
+# Saving the install.sh file
+install_file_path = "/mnt/data/install.sh"
+with open(install_file_path, "w") as file:
+    file.write(install_script_content)
+
+# Provide the file path for download
+install_file_path
