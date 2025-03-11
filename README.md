@@ -79,12 +79,6 @@ Ensure this line is added:
 @reboot /home/$(whoami)/tools-ai-lab/run.sh >> /home/$(whoami)/tools-ai-lab/logs/run.log 2>&1
 ```
 
-If using **systemd**, enable it with:
-```bash
-sudo systemctl enable run-ai-lab
-sudo systemctl start run-ai-lab
-```
-
 ---
 
 ## **📌 Uninstalling Everything**
@@ -98,38 +92,3 @@ This will:
 - Delete AI memory and logs
 
 ---
-
-## **📌 Troubleshooting**
-### **Port 80 Already in Use**
-If you get an **"Address already in use"** error, find and stop the conflicting process:
-```bash
-sudo lsof -i :80
-sudo systemctl stop nginx  # Example fix if Nginx is running
-```
-Then restart the AI:
-```bash
-./run.sh
-```
-
-### **Docker Issues**
-If Docker fails to start, try:
-```bash
-sudo systemctl stop docker
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-sudo systemctl start docker
-```
-Then rerun:
-```bash
-./run.sh
-```
-
----
-
-## **📌 Contributing**
-If you'd like to improve this project, **submit a pull request** or open an issue.
-
----
-
-## **📌 License**
-This project is licensed under **MIT License**.
