@@ -32,17 +32,27 @@ fi
 echo "🔄 Installing Ollama..."
 curl -fsSL https://ollama.ai/install.sh | sh
 
+# Start Ollama Service
+echo "🔄 Starting Ollama service..."
+sudo systemctl start ollama
+sleep 5
+
 # 4️⃣ Pull DeepSeek 7B Model
 echo "🔄 Downloading DeepSeek LLM 7B..."
 ollama pull deepseek-llm:7b
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to download DeepSeek 7B. Retrying..."
+    sleep 5
+    ollama pull deepseek-llm:7b
+fi
 
-# 5️⃣ Install Open WebUI
+# 5️⃣ Install Open WebUI (Using Docker Instead)
 echo "🔄 Installing Open WebUI..."
 mkdir -p $WEBUI_DIR
 cd $WEBUI_DIR
-wget https://github.com/open-webui/open-webui/releases/latest/download/open-webui-linux.zip
-unzip open-webui-linux.zip -d $WEBUI_DIR/
-chmod +x $WEBUI_DIR/open-webui
+
+echo "🔄 Pulling latest Open WebUI Docker image..."
+sudo docker pull openwebui/open-webui:latest
 
 # 6️⃣ Create Persistent Memory Directory
 echo "🔄 Checking and creating memory storage directory..."
@@ -77,10 +87,21 @@ services:
       - ./data:/app/data
 EOF
 
-# 8️⃣ Start Open WebUI
+# 8️⃣ Ensure Docker is Running
+echo "🔄 Checking if Docker is running..."
+sudo systemctl restart docker
+sleep 5
+
+# 9️⃣ Start Open WebUI
 echo "🚀 Starting Open WebUI..."
 cd $WEBUI_DIR
 sudo docker-compose up -d
+
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to start Open WebUI. Retrying..."
+    sleep 5
+    sudo docker-compose up -d
+fi
 
 echo "✅ Installation complete! 🎉"
 echo "🌐 Access your AI Assistant at: http://your-server-ip"
