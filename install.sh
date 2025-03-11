@@ -66,12 +66,23 @@ if [ $? -ne 0 ]; then
     ollama pull deepseek-llm:7b
 fi
 
-# 6️⃣ Install Open WebUI from GitHub Instead of Docker
+# 6️⃣ Install Open WebUI from GitHub (Fix Clone Errors)
+if [ -d "$WEBUI_DIR" ]; then
+    echo "⚠️ Open WebUI directory already exists. Cleaning up..."
+    sudo rm -rf "$WEBUI_DIR"
+fi
+
 echo "🔄 Installing Open WebUI from GitHub..."
 mkdir -p $WEBUI_DIR
 cd $WEBUI_DIR
 git clone https://github.com/open-webui/open-webui.git .
 chmod +x $WEBUI_DIR
+
+# Verify Dockerfile exists
+if [ ! -f "$WEBUI_DIR/Dockerfile" ]; then
+    echo "❌ ERROR: Dockerfile is missing in Open WebUI directory."
+    exit 1
+fi
 
 # Install dependencies for Open WebUI
 echo "🔄 Installing Open WebUI dependencies..."
