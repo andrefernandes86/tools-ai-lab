@@ -42,30 +42,6 @@ After installation, you can access Open WebUI at:
 
 ---
 
-## **📌 Running the AI Assistant**
-By default, the system runs **automatically on every reboot**.
-
-### **Manual Start**
-To manually start the AI assistant, run:
-```bash
-./run.sh
-```
-
-### **Stopping the AI**
-To stop the AI and all running services:
-```bash
-./stop.sh
-```
-
----
-
-## **📌 Updating the System**
-To update core components without losing AI memory:
-```bash
-./update.sh
-```
-
----
 
 ## **📌 Automatic Startup on Reboot**
 The system is configured to **automatically restart on every boot** using `crontab`.
@@ -76,19 +52,4 @@ sudo crontab -e
 ```
 Ensure this line is added:
 ```bash
-@reboot /home/$(whoami)/tools-ai-lab/run.sh >> /home/$(whoami)/tools-ai-lab/logs/run.log 2>&1
-```
-
----
-
-## **📌 Uninstalling Everything**
-To completely remove the AI assistant:
-```bash
-./uninstall.sh
-```
-This will:
-- Stop all services
-- Remove all installed components
-- Delete AI memory and logs
-
----
+@reboot sh /home/$(whoami)/tools-ai-lab/install.sh
