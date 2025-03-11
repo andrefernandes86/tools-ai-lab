@@ -33,13 +33,14 @@ if ! sudo systemctl is-active --quiet docker; then
     sudo systemctl start docker
 fi
 
-# 🔄 Step 4: Update Docker-Compose
-if ! command -v docker-compose &> /dev/null; then
-    echo "🔄 Installing Docker-Compose..."
+# 🔄 Step 4: Update Docker-Compose (Fixes 'ContainerConfig' Error)
+echo "🔄 Checking Docker-Compose version..."
+if ! command -v docker-compose &> /dev/null || [[ "$(docker-compose version --short)" < "2.20.0" ]]; then
+    echo "⚠️ Outdated or missing Docker-Compose! Installing latest version..."
     sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
 else
-    echo "✅ Docker-Compose is already installed."
+    echo "✅ Docker-Compose is up-to-date."
 fi
 
 # 🔄 Step 5: Check for Port 80 Conflicts
@@ -64,7 +65,7 @@ sudo systemctl start ollama
 echo "🔄 Downloading DeepSeek LLM 7B..."
 ollama pull deepseek-llm:7b
 
-# 🔄 Step 8: Clone Open WebUI from GitHub
+# 🔄 Step 8: Remove Old Open WebUI Installations
 WEBUI_DIR="/home/$(whoami)/open-webui"
 if [ -d "$WEBUI_DIR" ]; then
     echo "⚠️ Open WebUI directory already exists. Cleaning up..."
@@ -75,11 +76,16 @@ echo "🔄 Cloning Open WebUI from GitHub..."
 git clone https://github.com/open-webui/open-webui.git "$WEBUI_DIR"
 cd "$WEBUI_DIR"
 
-# 🔄 Step 9: Install Open WebUI Dependencies and Build
+# 🔄 Step 9: Remove Old Docker Containers & Volumes (Fixes 'ContainerConfig' Issue)
+echo "🗑️ Removing old Docker containers and volumes..."
+docker-compose down -v --remove-orphans
+docker system prune -af
+
+# 🔄 Step 10: Install Open WebUI Dependencies and Build
 echo "🔄 Installing Open WebUI dependencies..."
 docker-compose build --no-cache
 
-# 🔄 Step 10: Run Open WebUI on Port $PORT
+# 🔄 Step 11: Run Open WebUI on Port $PORT
 echo "🚀 Starting Open WebUI on port $PORT..."
 docker-compose up -d
 
