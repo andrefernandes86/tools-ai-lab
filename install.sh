@@ -28,12 +28,27 @@ if ! command -v docker-compose &> /dev/null; then
     sudo apt install -y docker-compose
 fi
 
-# Ensure Docker is running
-echo "🔄 Checking Docker service..."
-sudo systemctl restart docker
-sleep 5
+# 3️⃣ Fix Docker Startup Issues
+echo "🔄 Ensuring Docker is running correctly..."
+sudo systemctl stop docker
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl start docker
 
-# 3️⃣ Install Ollama
+# Verify Docker is working
+if ! sudo systemctl is-active --quiet docker; then
+    echo "❌ Docker failed to start! Attempting manual recovery..."
+    sudo systemctl restart docker
+    sleep 5
+    if ! sudo systemctl is-active --quiet docker; then
+        echo "🚨 ERROR: Docker could not be started. Check system logs!"
+        exit 1
+    fi
+fi
+
+echo "✅ Docker is running."
+
+# 4️⃣ Install Ollama
 echo "🔄 Installing Ollama..."
 curl -fsSL https://ollama.ai/install.sh | sh
 
@@ -42,7 +57,7 @@ echo "🔄 Starting Ollama service..."
 sudo systemctl start ollama
 sleep 5
 
-# 4️⃣ Pull DeepSeek 7B Model
+# 5️⃣ Pull DeepSeek 7B Model
 echo "🔄 Downloading DeepSeek LLM 7B..."
 ollama pull deepseek-llm:7b
 if [ $? -ne 0 ]; then
@@ -51,15 +66,14 @@ if [ $? -ne 0 ]; then
     ollama pull deepseek-llm:7b
 fi
 
-# 5️⃣ Install Open WebUI (Using Docker Instead)
+# 6️⃣ Install Open WebUI (Using Docker)
 echo "🔄 Installing Open WebUI..."
 mkdir -p $WEBUI_DIR
 cd $WEBUI_DIR
-
 echo "🔄 Pulling latest Open WebUI Docker image..."
 sudo docker pull openwebui/open-webui:latest
 
-# 6️⃣ Create Persistent Memory Directory
+# 7️⃣ Create Persistent Memory Directory
 echo "🔄 Checking and creating memory storage directory..."
 mkdir -p $DATA_DIR
 
@@ -85,7 +99,7 @@ fi
 
 echo "✅ Custom model 'my-deepseek-memory' created with memory support at $DATA_DIR."
 
-# 7️⃣ Configure Open WebUI
+# 8️⃣ Configure Open WebUI
 echo "🔄 Setting up Open WebUI to run on Port 80..."
 cat <<EOF > $WEBUI_DIR/docker-compose.yml
 version: '3.8'
@@ -102,11 +116,6 @@ services:
     volumes:
       - ./data:/app/data
 EOF
-
-# 8️⃣ Ensure Docker is Running
-echo "🔄 Checking if Docker is running..."
-sudo systemctl restart docker
-sleep 5
 
 # 9️⃣ Start Open WebUI
 echo "🚀 Starting Open WebUI..."
