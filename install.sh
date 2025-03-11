@@ -5,7 +5,7 @@ USER=$(whoami)
 DATA_DIR="/home/$USER/data"
 WEBUI_DIR="/home/$USER/open-webui"
 
-echo "🚀 Starting installation of Ollama + DeepSeek 7B + Open WebUI..."
+echo "🚀 Starting installation of Ollama + DeepSeek 7B + Open WebUI (GitHub Version)..."
 
 # 1️⃣ Update System Packages
 echo "🔄 Checking and updating system packages..."
@@ -13,7 +13,7 @@ sudo apt update && sudo apt upgrade -y
 
 # 2️⃣ Install Required Dependencies
 echo "🔄 Checking and installing missing dependencies..."
-sudo apt install -y python3 python3-venv python3-pip nginx curl wget unzip
+sudo apt install -y python3 python3-venv python3-pip nginx curl wget unzip git
 
 # Check and Install Docker
 if ! command -v docker &> /dev/null; then
@@ -66,12 +66,16 @@ if [ $? -ne 0 ]; then
     ollama pull deepseek-llm:7b
 fi
 
-# 6️⃣ Install Open WebUI (Using Docker)
-echo "🔄 Installing Open WebUI..."
+# 6️⃣ Install Open WebUI from GitHub Instead of Docker
+echo "🔄 Installing Open WebUI from GitHub..."
 mkdir -p $WEBUI_DIR
 cd $WEBUI_DIR
-echo "🔄 Pulling latest Open WebUI Docker image..."
-sudo docker pull openwebui/open-webui:latest
+git clone https://github.com/open-webui/open-webui.git .
+chmod +x $WEBUI_DIR
+
+# Install dependencies for Open WebUI
+echo "🔄 Installing Open WebUI dependencies..."
+sudo docker-compose build
 
 # 7️⃣ Create Persistent Memory Directory
 echo "🔄 Checking and creating memory storage directory..."
@@ -99,13 +103,13 @@ fi
 
 echo "✅ Custom model 'my-deepseek-memory' created with memory support at $DATA_DIR."
 
-# 8️⃣ Configure Open WebUI
+# 8️⃣ Configure Open WebUI (Updated for GitHub Version)
 echo "🔄 Setting up Open WebUI to run on Port 80..."
 cat <<EOF > $WEBUI_DIR/docker-compose.yml
 version: '3.8'
 services:
   open-webui:
-    image: openwebui/open-webui:latest
+    build: .
     container_name: open-webui
     restart: always
     ports:
@@ -117,15 +121,19 @@ services:
       - ./data:/app/data
 EOF
 
-# 9️⃣ Start Open WebUI
+# 9️⃣ Remove Old Docker Images to Avoid Conflicts
+echo "🗑️ Removing unused Docker images..."
+sudo docker system prune -af
+
+# 🔟 Start Open WebUI (GitHub Version)
 echo "🚀 Starting Open WebUI..."
 cd $WEBUI_DIR
-sudo docker-compose up -d
+sudo docker-compose up -d --build
 
 if [ $? -ne 0 ]; then
     echo "❌ Failed to start Open WebUI. Retrying..."
     sleep 5
-    sudo docker-compose up -d
+    sudo docker-compose up -d --build
 fi
 
 echo "✅ Installation complete! 🎉"
