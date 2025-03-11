@@ -1,25 +1,32 @@
 #!/bin/bash
 
-echo "🚀 Ensuring all AI services are running..."
+echo "🚀 Starting Ollama + Open WebUI..."
 
-# Start Ollama
-if ! pgrep -x "ollama" > /dev/null; then
-    echo "🔄 Starting Ollama..."
-    ollama serve &
-else
+# Ensure Docker is running
+if ! systemctl is-active --quiet docker; then
+    echo "🔄 Starting Docker service..."
+    sudo systemctl start docker
+fi
+
+# Ensure Docker service is properly initialized
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+
+# Check if containers are running
+if [ "$(docker ps -q -f name=ollama)" ]; then
     echo "✅ Ollama is already running."
-fi
-
-# Start Open WebUI
-cd /home/$(whoami)/open-webui
-if ! sudo docker ps | grep -q "open-webui"; then
-    echo "🔄 Starting Open WebUI..."
-    sudo docker-compose up -d
 else
-    echo "✅ Open WebUI is already running."
+    echo "🔄 Starting Ollama..."
+    docker start ollama || docker run -d --name ollama ollama/ollama:latest
 fi
 
-# Ensure Open WebUI starts on reboot
-sudo systemctl enable docker
+if [ "$(docker ps -q -f name=open-webui)" ]; then
+    echo "✅ Open WebUI is already running."
+else
+    echo "🔄 Starting Open WebUI..."
+    cd /home/$(whoami)/tools-ai-lab/
+    docker-compose up -d
+fi
 
-echo "✅ AI Assistant is fully operational. 🌐 Access at: http://your-server-ip"
+echo "✅ All services are up and running!"
+echo "🌐 Access Open WebUI at: http://$(hostname -I | awk '{print $1}')"
