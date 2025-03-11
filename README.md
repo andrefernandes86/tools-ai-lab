@@ -1,100 +1,135 @@
-# 🚀 Ollama + DeepSeek 7B + Open WebUI (Persistent Memory)
+# 🚀 AI Assistant - Ollama + DeepSeek 7B + Open WebUI
 
-This project sets up a **self-hosted AI assistant** using **Ollama** and **DeepSeek 7B**, with **Open WebUI** as the front-end interface.  
-The AI is configured to **remember past conversations** and **runs locally on port 80** for easy access.
-
----
-
-## **✨ Features**
-✅ **Ollama** - Local AI model runtime  
-✅ **DeepSeek 7B** - Advanced open-source AI model  
-✅ **Persistent Memory** - AI remembers past conversations  
-✅ **Open WebUI** - ChatGPT-style user interface  
-✅ **Runs on Port 80** - Access via a web browser  
-✅ **Automatic Start on Boot**  
-✅ **Update & Uninstall Scripts for Easy Management**  
+This project provides a fully functional AI assistant powered by **Ollama**, **DeepSeek 7B**, and **Open WebUI**. It includes automatic installation, updating, and system reboot persistence.
 
 ---
 
-# **📥 Step 1: Installation**
-### **1️⃣ Clone the Repository**
-Run the following commands on your server:
+## **📌 Features**
+✅ **Ollama** – AI model execution engine  
+✅ **DeepSeek 7B** – Language model with memory persistence  
+✅ **Open WebUI** – Web-based UI for interacting with the AI  
+✅ **Automatic startup on reboot**  
+✅ **Easy install, update, and stop scripts**
+
+---
+
+## **📌 Installation**
+### **Step 1: Clone the Repository**
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
-chmod +x install.sh run.sh update.sh stop.sh uninstall.sh
+git clone https://github.com/andrefernandes86/tools-ai-lab.git
+cd tools-ai-lab
 ```
 
-### **2️⃣ Run the Installation Script**
+### **Step 2: Make Scripts Executable**
+```bash
+chmod +x install.sh run.sh update.sh stop.sh
+```
+
+### **Step 3: Run the Installation**
 ```bash
 ./install.sh
 ```
-This will:
-- Install **Ollama**, **DeepSeek 7B**, and **Open WebUI**
-- Check and install **missing dependencies** (Docker, Python, Nginx, etc.)
-- Configure **AI memory storage** in `/home/$(whoami)/data/`
-- Start **all services automatically**  
+- This installs **all dependencies** (Docker, Python, Ollama, DeepSeek 7B, and Open WebUI).
+- The AI **remembers previous interactions**.
+- It **configures Open WebUI on port 80**.
 
 ---
 
-# **🌐 Step 2: How to Access the AI System**
-### **1️⃣ Access the Web App**
-Once installed, open your browser and visit:
+## **📌 Access the AI Assistant**
+After installation, you can access Open WebUI at:
 
-👉 **http://your-server-ip**  
-or  
-👉 **http://localhost** *(if running locally)*  
+🔗 **http://your-server-ip**
 
 ---
 
-# **🛠️ Step 3: Managing the AI System**
-### **1️⃣ Start & Ensure AI is Running**
-If the AI system is not running, start it with:
+## **📌 Running the AI Assistant**
+By default, the system runs **automatically on every reboot**.
+
+### **Manual Start**
+To manually start the AI assistant, run:
 ```bash
 ./run.sh
 ```
 
-### **2️⃣ Stop the AI Assistant**
-To **stop all AI services**, run:
+### **Stopping the AI**
+To stop the AI and all running services:
 ```bash
 ./stop.sh
 ```
 
-### **3️⃣ Restart the AI Assistant**
-To restart both **Ollama and Open WebUI**, run:
-```bash
-sudo systemctl restart ollama
-cd /home/$(whoami)/open-webui
-sudo docker-compose restart
-```
-
 ---
 
-# **🔄 Step 4: Updating the AI Assistant**
-To **update Ollama, DeepSeek 7B, and Open WebUI** while preserving AI memory, run:
+## **📌 Updating the System**
+To update core components without losing AI memory:
 ```bash
 ./update.sh
 ```
 
-This will:
-- **Update system libraries**  
-- **Update Ollama & DeepSeek 7B** (without deleting AI memory)  
-- **Pull the latest Open WebUI updates**  
+---
+
+## **📌 Automatic Startup on Reboot**
+The system is configured to **automatically restart on every boot** using `crontab`.
+
+To manually check or re-enable the startup script:
+```bash
+sudo crontab -e
+```
+Ensure this line is added:
+```bash
+@reboot /home/$(whoami)/tools-ai-lab/run.sh >> /home/$(whoami)/tools-ai-lab/logs/run.log 2>&1
+```
+
+If using **systemd**, enable it with:
+```bash
+sudo systemctl enable run-ai-lab
+sudo systemctl start run-ai-lab
+```
 
 ---
 
-# **🗑️ Step 5: Uninstalling the AI Assistant**
-To **completely remove** the AI system, run:
+## **📌 Uninstalling Everything**
+To completely remove the AI assistant:
 ```bash
 ./uninstall.sh
 ```
-
 This will:
-✅ **Stop and remove all AI services**  
-✅ **Delete Ollama & DeepSeek 7B**  
-✅ **Remove AI memory storage (`/home/$(whoami)/data/`)**  
-✅ **Uninstall all dependencies**  
+- Stop all services
+- Remove all installed components
+- Delete AI memory and logs
 
 ---
 
-🚀 **Enjoy your personal AI assistant!** 🎉
+## **📌 Troubleshooting**
+### **Port 80 Already in Use**
+If you get an **"Address already in use"** error, find and stop the conflicting process:
+```bash
+sudo lsof -i :80
+sudo systemctl stop nginx  # Example fix if Nginx is running
+```
+Then restart the AI:
+```bash
+./run.sh
+```
+
+### **Docker Issues**
+If Docker fails to start, try:
+```bash
+sudo systemctl stop docker
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl start docker
+```
+Then rerun:
+```bash
+./run.sh
+```
+
+---
+
+## **📌 Contributing**
+If you'd like to improve this project, **submit a pull request** or open an issue.
+
+---
+
+## **📌 License**
+This project is licensed under **MIT License**.
