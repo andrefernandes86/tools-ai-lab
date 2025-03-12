@@ -1,11 +1,10 @@
 #!/bin/bash
 # This script installs Ollama, pulls the DeepSeek 7B model, and sets up Open WebUI from GitHub.
-# It includes safeguards to detect and fix problems.
+# It includes safeguards to detect and fix problems, including removing conflicting containerd packages.
 
-# Exit immediately if a command exits with a non-zero status
 set -e
 
-# Function to check command exit status and exit with a message if failed
+# Function to check the exit status and exit with a message if a command fails
 function check_exit {
     if [ $? -ne 0 ]; then
         echo "❌ Error: $1"
@@ -29,6 +28,18 @@ check_exit "System package update failed."
 echo "🔄 Installing required dependencies..."
 sudo apt install -y python3 python3-venv python3-pip nginx curl wget unzip git docker.io docker-compose
 check_exit "Failed to install dependencies."
+
+# Remove conflicting containerd packages if present
+echo "🔄 Checking for conflicting containerd packages..."
+if dpkg -l | grep -q '^ii\s\+containerd.io\s'; then
+    echo "⚠️ Removing containerd.io to avoid conflicts..."
+    sudo apt remove -y containerd.io
+fi
+if dpkg -l | grep -q '^ii\s\+containerd\s'; then
+    echo "⚠️ Removing containerd to avoid conflicts..."
+    sudo apt remove -y containerd
+fi
+sudo apt --fix-broken install -y
 
 # 3️⃣ Ensure Docker is running
 echo "🔄 Ensuring Docker is running..."
@@ -101,7 +112,6 @@ cat <<EOF > "$DATA_DIR/memory_model.modelfile"
 FROM deepseek-llm:7b
 PARAMETER memory=True
 EOF
-
 if [ ! -s "$DATA_DIR/memory_model.modelfile" ]; then
     echo "❌ Error: Memory model file was not created correctly."
     exit 1
@@ -134,7 +144,6 @@ services:
     volumes:
       - "$DATA_DIR:/app/data"
 EOF
-
 if [ $? -ne 0 ]; then
     echo "❌ Failed to write docker-compose.yml."
     exit 1
