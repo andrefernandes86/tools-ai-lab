@@ -1,10 +1,14 @@
 #!/bin/bash
-# This script installs Ollama, pulls the DeepSeek 7B model, and sets up Open WebUI from GitHub.
-# It includes safeguards to detect and fix problems, including removing conflicting containerd packages.
+# This script installs Ollama, pulls the DeepSeek 7B model, creates a custom memory‑enabled model,
+# and sets up Open WebUI from GitHub.
+# It also removes conflicting tools and ensures all components restart after a reboot.
+#
+# WARNING: This script will remove packages (containerd.io, containerd, podman) that might be used by other tools.
+# Review before running.
 
 set -e
 
-# Function to check the exit status and exit with a message if a command fails
+# Function: Check exit status and exit with an error message if a command fails.
 function check_exit {
     if [ $? -ne 0 ]; then
         echo "❌ Error: $1"
@@ -12,36 +16,45 @@ function check_exit {
     fi
 }
 
-# Detect username dynamically
-USER_NAME=$(whoami)
-DATA_DIR="/home/$USER_NAME/data"
-WEBUI_DIR="/home/$USER_NAME/open-webui"
+# ------------------------------------------------------------------------------
+# STEP 0: Remove Conflicting Packages and Tools
+# ------------------------------------------------------------------------------
+echo "🔄 Removing conflicting packages/tools..."
+# Remove containerd.io if installed.
+if dpkg -l | grep -q '^ii\s\+containerd.io\s'; then
+    echo "⚠️ Removing containerd.io..."
+    sudo apt remove -y containerd.io
+    check_exit "Failed to remove containerd.io"
+    sudo apt --fix-broken install -y
+fi
+# Remove containerd if installed.
+if dpkg -l | grep -q '^ii\s\+containerd\s'; then
+    echo "⚠️ Removing containerd..."
+    sudo apt remove -y containerd
+fi
+# Remove podman if installed.
+if dpkg -l | grep -q '^ii\s\+podman\s'; then
+    echo "⚠️ Removing podman..."
+    sudo apt remove -y podman
+fi
 
-echo "🚀 Starting installation of Ollama + DeepSeek 7B + Open WebUI (GitHub Version)..."
-
-# 1️⃣ Update System Packages
-echo "🔄 Checking and updating system packages..."
+# ------------------------------------------------------------------------------
+# STEP 1: Update System Packages
+# ------------------------------------------------------------------------------
+echo "🔄 Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 check_exit "System package update failed."
 
-# 2️⃣ Install Required Dependencies
+# ------------------------------------------------------------------------------
+# STEP 2: Install Required Dependencies
+# ------------------------------------------------------------------------------
 echo "🔄 Installing required dependencies..."
 sudo apt install -y python3 python3-venv python3-pip nginx curl wget unzip git docker.io docker-compose
 check_exit "Failed to install dependencies."
 
-# Remove conflicting containerd packages if present
-echo "🔄 Checking for conflicting containerd packages..."
-if dpkg -l | grep -q '^ii\s\+containerd.io\s'; then
-    echo "⚠️ Removing containerd.io to avoid conflicts..."
-    sudo apt remove -y containerd.io
-fi
-if dpkg -l | grep -q '^ii\s\+containerd\s'; then
-    echo "⚠️ Removing containerd to avoid conflicts..."
-    sudo apt remove -y containerd
-fi
-sudo apt --fix-broken install -y
-
-# 3️⃣ Ensure Docker is running
+# ------------------------------------------------------------------------------
+# STEP 3: Ensure Docker Is Running
+# ------------------------------------------------------------------------------
 echo "🔄 Ensuring Docker is running..."
 sudo systemctl enable --now docker
 sudo systemctl stop docker || true
@@ -50,7 +63,7 @@ sudo systemctl daemon-reload
 sudo systemctl start docker
 sleep 2
 if ! sudo systemctl is-active --quiet docker; then
-    echo "❌ Docker failed to start. Attempting manual restart..."
+    echo "❌ Docker failed to start. Restarting manually..."
     sudo systemctl restart docker
     sleep 5
     if ! sudo systemctl is-active --quiet docker; then
@@ -60,13 +73,14 @@ if ! sudo systemctl is-active --quiet docker; then
 fi
 echo "✅ Docker is running."
 
-# 4️⃣ Install Ollama
+# ------------------------------------------------------------------------------
+# STEP 4: Install Ollama and Ensure It Auto-Restarts
+# ------------------------------------------------------------------------------
 echo "🔄 Installing Ollama..."
 curl -fsSL https://ollama.ai/install.sh | sh
 check_exit "Ollama installation failed."
 
-# Start and enable Ollama service
-echo "🔄 Starting Ollama service..."
+echo "🔄 Enabling and starting Ollama service..."
 sudo systemctl enable --now ollama
 sleep 5
 if ! sudo systemctl is-active --quiet ollama; then
@@ -74,39 +88,44 @@ if ! sudo systemctl is-active --quiet ollama; then
     exit 1
 fi
 
-# 5️⃣ Pull DeepSeek 7B Model
+# ------------------------------------------------------------------------------
+# STEP 5: Create Systemd Override for Ollama to Auto-Load Custom Model
+# ------------------------------------------------------------------------------
+# This override ensures that after Ollama starts, it will automatically run the custom model.
+echo "🔄 Creating systemd override for Ollama to auto-load the custom model..."
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<EOF
+[Service]
+# Wait a few seconds to ensure Ollama is fully up, then load the custom model.
+ExecStartPost=/bin/bash -c "sleep 10 && /usr/local/bin/ollama run my-deepseek-memory"
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+
+# ------------------------------------------------------------------------------
+# STEP 6: Pull DeepSeek 7B Model
+# ------------------------------------------------------------------------------
 echo "🔄 Downloading DeepSeek LLM 7B..."
-ollama pull deepseek-llm:7b
-if [ $? -ne 0 ]; then
+ollama pull deepseek-llm:7b || {
     echo "❌ Failed to download DeepSeek 7B on first attempt. Retrying in 5 seconds..."
     sleep 5
     ollama pull deepseek-llm:7b || { echo "❌ Failed to download DeepSeek 7B after retry."; exit 1; }
-fi
+}
 
-# 6️⃣ Clone Open WebUI from GitHub
-echo "🔄 Installing Open WebUI from GitHub..."
-if [ -d "$WEBUI_DIR" ]; then
-    echo "⚠️ Open WebUI directory already exists. Removing old installation..."
-    sudo rm -rf "$WEBUI_DIR"
-fi
-mkdir -p "$WEBUI_DIR"
-cd "$WEBUI_DIR"
-git clone https://github.com/open-webui/open-webui.git .
-check_exit "Failed to clone Open WebUI repository."
+# ------------------------------------------------------------------------------
+# STEP 7: Create Persistent Data Directory and Custom Model File
+# ------------------------------------------------------------------------------
+# Set up directories for persistent data and for Open WebUI.
+USER_NAME=$(whoami)
+DATA_DIR="/home/$USER_NAME/data"
+WEBUI_DIR="/home/$USER_NAME/open-webui"
 
-# 7️⃣ Build Open WebUI Docker Image
-echo "🔄 Building Open WebUI Docker image..."
-sudo docker-compose build
-check_exit "Docker-compose build failed."
-
-# 8️⃣ Create Persistent Data Directory
-echo "🔄 Checking and creating persistent data directory..."
+echo "🔄 Creating persistent data directory at $DATA_DIR..."
 if [ ! -d "$DATA_DIR" ]; then
     mkdir -p "$DATA_DIR"
     check_exit "Failed to create data directory at $DATA_DIR."
 fi
 
-# 9️⃣ Create Custom Model File with Memory Enabled
 echo "🔄 Creating custom model file with memory support..."
 cat <<EOF > "$DATA_DIR/memory_model.modelfile"
 FROM deepseek-llm:7b
@@ -117,17 +136,37 @@ if [ ! -s "$DATA_DIR/memory_model.modelfile" ]; then
     exit 1
 fi
 
-# 🔟 Create the Custom Memory-Enabled Model in Ollama
 echo "🔄 Creating custom memory-enabled model 'my-deepseek-memory'..."
-ollama create my-deepseek-memory -f "$DATA_DIR/memory_model.modelfile"
-if [ $? -ne 0 ]; then
+ollama create my-deepseek-memory -f "$DATA_DIR/memory_model.modelfile" || {
     echo "❌ Failed to create the custom memory model. Retrying in 5 seconds..."
     sleep 5
     ollama create my-deepseek-memory -f "$DATA_DIR/memory_model.modelfile" || { echo "❌ Failed to create the custom memory model after retry."; exit 1; }
-fi
+}
 echo "✅ Custom model 'my-deepseek-memory' created successfully."
 
-# 1️⃣1️⃣ Configure Open WebUI (Docker Compose File)
+# ------------------------------------------------------------------------------
+# STEP 8: Clone and Prepare Open WebUI
+# ------------------------------------------------------------------------------
+echo "🔄 Installing Open WebUI from GitHub..."
+if [ -d "$WEBUI_DIR" ]; then
+    echo "⚠️ Open WebUI directory already exists. Removing old installation..."
+    sudo rm -rf "$WEBUI_DIR"
+fi
+mkdir -p "$WEBUI_DIR"
+cd "$WEBUI_DIR"
+git clone https://github.com/open-webui/open-webui.git .
+check_exit "Failed to clone Open WebUI repository."
+
+# ------------------------------------------------------------------------------
+# STEP 9: Build Open WebUI Docker Image
+# ------------------------------------------------------------------------------
+echo "🔄 Building Open WebUI Docker image..."
+sudo docker-compose build
+check_exit "Docker-compose build failed."
+
+# ------------------------------------------------------------------------------
+# STEP 10: Configure Open WebUI Docker Compose
+# ------------------------------------------------------------------------------
 echo "🔄 Configuring Open WebUI..."
 cat <<EOF > "$WEBUI_DIR/docker-compose.yml"
 version: '3.8'
@@ -149,19 +188,39 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 1️⃣2️⃣ Remove Unused Docker Images
+# ------------------------------------------------------------------------------
+# STEP 11: Remove Unused Docker Images
+# ------------------------------------------------------------------------------
 echo "🗑️ Removing unused Docker images..."
 sudo docker system prune -af
 
-# 1️⃣3️⃣ Start Open WebUI Using Docker Compose
-echo "🚀 Starting Open WebUI..."
-cd "$WEBUI_DIR"
-sudo docker-compose up -d --build
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to start Open WebUI. Retrying in 5 seconds..."
-    sleep 5
-    sudo docker-compose up -d --build || { echo "❌ Failed to start Open WebUI after retry."; exit 1; }
-fi
+# ------------------------------------------------------------------------------
+# STEP 12: Create a Systemd Service for Open WebUI
+# ------------------------------------------------------------------------------
+echo "🔄 Creating systemd service for Open WebUI..."
+sudo tee /etc/systemd/system/open-webui.service > /dev/null <<EOF
+[Unit]
+Description=Open WebUI Service
+After=docker.service
+Requires=docker.service
 
+[Service]
+WorkingDirectory=$WEBUI_DIR
+ExecStart=/usr/bin/docker-compose up -d --build
+ExecStop=/usr/bin/docker-compose down
+Restart=always
+User=$USER_NAME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable open-webui
+sudo systemctl start open-webui
+
+# ------------------------------------------------------------------------------
+# STEP 13: Final Message
+# ------------------------------------------------------------------------------
 echo "✅ Installation complete! 🎉"
 echo "🌐 Access your AI Assistant at: http://your-server-ip"
