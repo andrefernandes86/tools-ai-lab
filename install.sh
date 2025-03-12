@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------
-# 🚀 Ollama + DeepSeek 7B + Open WebUI Installer (Auto-Restart Enabled)
+# 🚀 Ollama + DeepSeek 7B + Open WebUI Installer
 # -------------------------------
 
 echo "🚀 Starting installation of Ollama + DeepSeek 7B + Open WebUI (GitHub Version)..."
@@ -33,14 +33,13 @@ if ! sudo systemctl is-active --quiet docker; then
     sudo systemctl start docker
 fi
 
-# 🔄 Step 4: Update Docker-Compose (Fixes 'ContainerConfig' Error)
-echo "🔄 Checking Docker-Compose version..."
-if ! command -v docker-compose &> /dev/null || [[ "$(docker-compose version --short)" < "2.20.0" ]]; then
-    echo "⚠️ Outdated or missing Docker-Compose! Installing latest version..."
+# 🔄 Step 4: Update Docker-Compose
+if ! command -v docker-compose &> /dev/null; then
+    echo "🔄 Installing Docker-Compose..."
     sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
 else
-    echo "✅ Docker-Compose is up-to-date."
+    echo "✅ Docker-Compose is already installed."
 fi
 
 # 🔄 Step 5: Check for Port 80 Conflicts
@@ -65,29 +64,7 @@ sudo systemctl start ollama
 echo "🔄 Downloading DeepSeek LLM 7B..."
 ollama pull deepseek-llm:7b
 
-# 🔄 Step 8: Configure Ollama to Auto-Load DeepSeek 7B
-echo "🔄 Configuring Ollama systemd service..."
-cat <<EOF | sudo tee /etc/systemd/system/ollama.service
-[Unit]
-Description=Ollama Service
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/ollama serve
-ExecStartPost=/bin/bash -c "sleep 10 && /usr/local/bin/ollama run deepseek-llm:7b"
-Restart=always
-User=$(whoami)
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and restart Ollama service
-sudo systemctl daemon-reload
-sudo systemctl enable ollama
-sudo systemctl restart ollama
-
-# 🔄 Step 9: Remove Old Open WebUI Installations
+# 🔄 Step 8: Clone Open WebUI from GitHub
 WEBUI_DIR="/home/$(whoami)/open-webui"
 if [ -d "$WEBUI_DIR" ]; then
     echo "⚠️ Open WebUI directory already exists. Cleaning up..."
@@ -98,42 +75,13 @@ echo "🔄 Cloning Open WebUI from GitHub..."
 git clone https://github.com/open-webui/open-webui.git "$WEBUI_DIR"
 cd "$WEBUI_DIR"
 
-# 🔄 Step 10: Remove Old Docker Containers & Volumes (Fixes 'ContainerConfig' Issue)
-echo "🗑️ Removing old Docker containers and volumes..."
-docker-compose down -v --remove-orphans
-docker system prune -af
-
-# 🔄 Step 11: Install Open WebUI Dependencies and Build
+# 🔄 Step 9: Install Open WebUI Dependencies and Build
 echo "🔄 Installing Open WebUI dependencies..."
 docker-compose build --no-cache
 
-# 🔄 Step 12: Run Open WebUI on Port $PORT
+# 🔄 Step 10: Run Open WebUI on Port $PORT
 echo "🚀 Starting Open WebUI on port $PORT..."
 docker-compose up -d
-
-# 🔄 Step 13: Create a Systemd Service for Open WebUI to Auto-Start
-echo "🔄 Creating systemd service for Open WebUI..."
-cat <<EOF | sudo tee /etc/systemd/system/open-webui.service
-[Unit]
-Description=Open WebUI Service
-After=docker.service
-Requires=docker.service
-
-[Service]
-WorkingDirectory=$WEBUI_DIR
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
-Restart=always
-User=$(whoami)
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start the Open WebUI service
-sudo systemctl daemon-reload
-sudo systemctl enable open-webui
-sudo systemctl start open-webui
 
 echo "✅ Installation complete! 🎉"
 echo "🌐 Access your AI Assistant at: http://your-server-ip:$PORT"
