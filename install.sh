@@ -111,18 +111,17 @@ fi
 # ------------------------------------------------------------------------------
 # STEP 5: Create Systemd Override for Ollama to Auto-Load Custom Model
 # ------------------------------------------------------------------------------
-# This override waits until the custom model "my-deepseek-memory" is listed (checking every 5 seconds)
-# and then runs it.
+# The ExecStartPost command now has a leading dash and "|| true" to ignore errors.
 echo "🔄 Creating systemd override for Ollama to auto-load the custom model..."
 sudo mkdir -p /etc/systemd/system/ollama.service.d
 sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<'EOF'
 [Service]
-ExecStartPost=/bin/bash -c 'sleep 10; \
+ExecStartPost=-/bin/bash -c 'sleep 10; \
   while ! /usr/local/bin/ollama list | grep -q my-deepseek-memory; do \
     echo "Waiting for custom model my-deepseek-memory to be available..."; \
     sleep 5; \
   done; \
-  /usr/local/bin/ollama run my-deepseek-memory'
+  /usr/local/bin/ollama run my-deepseek-memory || true'
 EOF
 sudo systemctl daemon-reload
 sudo systemctl restart ollama
