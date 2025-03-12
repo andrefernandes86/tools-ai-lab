@@ -1,9 +1,10 @@
 #!/bin/bash
 # This script installs Ollama, pulls the DeepSeek 7B model, creates a custom memory‑enabled model,
 # and sets up Open WebUI from GitHub.
-# It also removes conflicting tools and ensures all components (containers, LLMs, etc.) restart after reboot.
+# It removes conflicting tools (containerd.io, containerd, podman) and ensures all deployed components
+# (Docker containers, Ollama service, etc.) restart automatically after a reboot.
 #
-# WARNING: This script will remove packages (containerd.io, containerd, podman) that might be used by other tools.
+# WARNING: This script will remove packages (containerd.io, containerd, podman) and may delete some Docker-related files.
 # Please review before running.
 
 set -e
@@ -53,9 +54,28 @@ sudo apt install -y python3 python3-venv python3-pip nginx curl wget unzip git d
 check_exit "Failed to install dependencies."
 
 # ------------------------------------------------------------------------------
-# STEP 3: Ensure Docker Is Running
+# STEP 3: Ensure Containerd and Docker Are Running
 # ------------------------------------------------------------------------------
-echo "🔄 Ensuring Docker is running..."
+echo "🔄 Starting containerd..."
+sudo systemctl enable --now containerd || true
+sleep 2
+if ! sudo systemctl is-active --quiet containerd; then
+    echo "❌ containerd failed to start. Restarting manually..."
+    sudo systemctl restart containerd
+    sleep 5
+    if ! sudo systemctl is-active --quiet containerd; then
+        echo "🚨 ERROR: containerd could not be started. Check system logs!"
+        exit 1
+    fi
+fi
+echo "✅ containerd is running."
+
+# Remove stale Docker PID/socket files if they exist
+echo "🔄 Cleaning up any stale Docker files..."
+sudo rm -f /var/run/docker.pid || true
+sudo rm -f /var/run/docker.sock || true
+
+echo "🔄 Starting Docker..."
 sudo systemctl enable --now docker
 sudo systemctl stop docker || true
 sudo systemctl daemon-reexec
@@ -91,13 +111,12 @@ fi
 # ------------------------------------------------------------------------------
 # STEP 5: Create Systemd Override for Ollama to Auto-Load Custom Model
 # ------------------------------------------------------------------------------
-# We update the Ollama service so that after startup it waits until the custom model "my-deepseek-memory"
-# is available (using a loop check) and then runs it.
+# This override waits until the custom model "my-deepseek-memory" is listed (checking every 5 seconds)
+# and then runs it.
 echo "🔄 Creating systemd override for Ollama to auto-load the custom model..."
 sudo mkdir -p /etc/systemd/system/ollama.service.d
 sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<'EOF'
 [Service]
-# Wait for Ollama to fully start. Then check every 5 seconds until the custom model appears.
 ExecStartPost=/bin/bash -c 'sleep 10; \
   while ! /usr/local/bin/ollama list | grep -q my-deepseek-memory; do \
     echo "Waiting for custom model my-deepseek-memory to be available..."; \
