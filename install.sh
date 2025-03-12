@@ -1,10 +1,10 @@
 #!/bin/bash
 # This script installs Ollama, pulls the DeepSeek 7B model, creates a custom memory‑enabled model,
 # and sets up Open WebUI from GitHub.
-# It also removes conflicting tools and ensures all components restart after a reboot.
+# It also removes conflicting tools and ensures all components (containers, LLMs, etc.) restart after reboot.
 #
 # WARNING: This script will remove packages (containerd.io, containerd, podman) that might be used by other tools.
-# Review before running.
+# Please review before running.
 
 set -e
 
@@ -91,13 +91,19 @@ fi
 # ------------------------------------------------------------------------------
 # STEP 5: Create Systemd Override for Ollama to Auto-Load Custom Model
 # ------------------------------------------------------------------------------
-# This override ensures that after Ollama starts, it will automatically run the custom model.
+# We update the Ollama service so that after startup it waits until the custom model "my-deepseek-memory"
+# is available (using a loop check) and then runs it.
 echo "🔄 Creating systemd override for Ollama to auto-load the custom model..."
 sudo mkdir -p /etc/systemd/system/ollama.service.d
-sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<EOF
+sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<'EOF'
 [Service]
-# Wait a few seconds to ensure Ollama is fully up, then load the custom model.
-ExecStartPost=/bin/bash -c "sleep 10 && /usr/local/bin/ollama run my-deepseek-memory"
+# Wait for Ollama to fully start. Then check every 5 seconds until the custom model appears.
+ExecStartPost=/bin/bash -c 'sleep 10; \
+  while ! /usr/local/bin/ollama list | grep -q my-deepseek-memory; do \
+    echo "Waiting for custom model my-deepseek-memory to be available..."; \
+    sleep 5; \
+  done; \
+  /usr/local/bin/ollama run my-deepseek-memory'
 EOF
 sudo systemctl daemon-reload
 sudo systemctl restart ollama
@@ -115,7 +121,6 @@ ollama pull deepseek-llm:7b || {
 # ------------------------------------------------------------------------------
 # STEP 7: Create Persistent Data Directory and Custom Model File
 # ------------------------------------------------------------------------------
-# Set up directories for persistent data and for Open WebUI.
 USER_NAME=$(whoami)
 DATA_DIR="/home/$USER_NAME/data"
 WEBUI_DIR="/home/$USER_NAME/open-webui"
